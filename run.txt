@@ -101,4 +101,9 @@ To safely shut down the entire project and free up memory, perform these steps i
    ```bash
    docker compose down
    ```
-   *(Note: If you are using an older version of Docker, the command is `docker-compose down`).* This safely stops and removes the database and Redis containers without losing your data.
+   *(Note: If you are using an older version of Docker, the command is `docker-compose down`).* This safely stops and removes the Redis container.
+
+4. **Stop MongoDB:** Because MongoDB was started manually outside of docker-compose, you need to stop it manually by running:
+   ```bash
+   docker stop mongodb
+   ```
