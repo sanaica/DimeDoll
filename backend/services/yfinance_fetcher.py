@@ -3,11 +3,14 @@ import yfinance as yf
 import json
 import logging
 import random
+import os
+import time
 from redis.asyncio import Redis
 from typing import List
 from database import get_database
 
 logger = logging.getLogger(__name__)
+
 
 class YFinanceFetcher:
     def __init__(self, redis_client: Redis, tickers: List[str]):
@@ -30,7 +33,7 @@ class YFinanceFetcher:
                 portfolio_data = await self.redis.get("user:portfolio")
                 portfolio = json.loads(portfolio_data) if portfolio_data else {"cash": 1000000.0, "holdings": {}}
                 portfolio_updated = False
-                
+
                 updates = []
                 executed_trades = []
                 
@@ -68,7 +71,7 @@ class YFinanceFetcher:
                                 base_insight = {"action": "BUY", "confidence": 60, "pattern": "Upward Momentum"}
                             else:
                                 base_insight = {"action": "SELL", "confidence": 60, "pattern": "Downward Momentum"}
-                        
+
                         # Apply Profile Logic
                         if base_insight and profile:
                             risk = profile.get("risk_tolerance", "Moderate")
@@ -84,44 +87,23 @@ class YFinanceFetcher:
                                     base_insight["action"] = "BUY"
                                     base_insight["pattern"] += " (Upgraded: Aggressive)"
                                     
-                            if profile.get("auto_invest"):
-                                if base_insight["action"] == "BUY":
-                                    if portfolio["cash"] >= latest_price:
-                                        portfolio["cash"] -= float(latest_price)
-                                        portfolio["holdings"][ticker] = portfolio["holdings"].get(ticker, 0) + 1
-                                        portfolio_updated = True
-                                        executed_trades.append({
-                                            "ticker": ticker,
-                                            "price": round(float(latest_price), 2),
-                                            "action": "BUY",
-                                            "timestamp": str(data.index[-1]),
-                                            "reason": base_insight["pattern"]
-                                        })
-                                    else:
-                                        base_insight["pattern"] += " (Failed: Insufficient Funds)"
-                                        
-                                elif base_insight["action"] == "SELL":
-                                    if portfolio["holdings"].get(ticker, 0) > 0:
-                                        portfolio["cash"] += float(latest_price)
-                                        portfolio["holdings"][ticker] -= 1
-                                        if portfolio["holdings"][ticker] == 0:
-                                            del portfolio["holdings"][ticker]
-                                        portfolio_updated = True
-                                        executed_trades.append({
-                                            "ticker": ticker,
-                                            "price": round(float(latest_price), 2),
-                                            "action": "SELL",
-                                            "timestamp": str(data.index[-1]),
-                                            "reason": base_insight["pattern"]
-                                        })
-                                    else:
-                                        base_insight["pattern"] += " (Failed: No Holdings)"
+                        # Removed legacy math-based auto trading here.
+                        # The math indicator now strictly provides insights and never touches the user's wallet.
                         
+                        history_points = []
+                        for ts, p in series.tail(60).items():
+                            try:
+                                time_str = ts.strftime('%H:%M')
+                            except:
+                                time_str = str(ts)
+                            history_points.append({"time": time_str, "price": round(float(p), 2)})
+
                         tick_data = {
                             "ticker": ticker,
                             "price": round(float(latest_price), 2),
                             "timestamp": str(data.index[-1]),
-                            "insight": base_insight
+                            "insight": base_insight,
+                            "history": history_points
                         }
                         
                         # Set in Redis (Flash Layer Memory)

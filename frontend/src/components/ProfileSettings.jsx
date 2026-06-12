@@ -123,17 +123,6 @@ const ProfileSettings = ({ currentUser }) => {
           />
         </div>
 
-        <div className="form-group checkbox-group" style={{ marginTop: '24px', padding: '16px', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '8px' }}>
-          <label className="toggle-label">
-            <div>
-              <span style={{ display: 'block', fontWeight: 600, color: 'var(--text-primary)' }}>Auto-Invest</span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Execute AI signals instantly</span>
-            </div>
-            <input type="checkbox" name="auto_invest" checked={profile.auto_invest} onChange={handleChange} className="toggle-input" />
-            <span className="toggle-slider"></span>
-          </label>
-        </div>
-
         <button type="submit" className="btn-primary" disabled={saving} style={{ marginTop: '16px' }}>
           {saving ? 'Processing AI Evaluation...' : 'Update & Sync AI'}
         </button>

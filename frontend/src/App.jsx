@@ -5,6 +5,9 @@ import DashboardPage from './pages/DashboardPage';
 import WalletPage from './pages/WalletPage';
 import ProfilePage from './pages/ProfilePage';
 import AuthPage from './pages/AuthPage';
+import SimulatorPage from './pages/SimulatorPage';
+import RecommendationsPage from './pages/RecommendationsPage';
+import { UserProfileProvider } from './context/UserProfileContext';
 
 const ProtectedLayout = ({ children, wsStatus, currentUser }) => {
   return (
@@ -22,6 +25,7 @@ function MainApp() {
   const [wsStatus, setWsStatus] = useState('connecting');
   const [executedTrades, setExecutedTrades] = useState([]);
   const [portfolio, setPortfolio] = useState(null);
+  const [aiThoughts, setAiThoughts] = useState("");
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -72,7 +76,7 @@ function MainApp() {
             const newInsights = { ...insights };
             
             dataArr.forEach(item => {
-              newTicks[item.ticker] = { price: item.price, timestamp: item.timestamp };
+              newTicks[item.ticker] = { price: item.price, timestamp: item.timestamp, history: item.history, insight: item.insight };
               if (item.insight && Object.keys(item.insight).length > 0) {
                 newInsights[item.ticker] = item.insight;
               }
@@ -84,6 +88,8 @@ function MainApp() {
             setExecutedTrades(prev => [...message.data, ...prev]);
           } else if (message.type === 'portfolio_update') {
             setPortfolio(message.data);
+          } else if (message.type === 'auto_trader_thoughts') {
+            setAiThoughts(message.data);
           }
         } catch (error) {
           console.error('Error parsing websocket message', error);
@@ -110,15 +116,19 @@ function MainApp() {
   }
 
   return (
-    <ProtectedLayout wsStatus={wsStatus} currentUser={currentUser}>
-      <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<DashboardPage ticksData={ticksData} insights={insights} />} />
-        <Route path="/wallet" element={<WalletPage portfolio={portfolio} ticksData={ticksData} executedTrades={executedTrades} currentUser={currentUser} />} />
-        <Route path="/profile" element={<ProfilePage currentUser={currentUser} />} />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
-      </Routes>
-    </ProtectedLayout>
+    <UserProfileProvider currentUser={currentUser}>
+      <ProtectedLayout wsStatus={wsStatus} currentUser={currentUser}>
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<DashboardPage ticksData={ticksData} insights={insights} currentUser={currentUser} portfolio={portfolio} />} />
+          <Route path="/wallet" element={<WalletPage portfolio={portfolio} ticksData={ticksData} executedTrades={executedTrades} currentUser={currentUser} />} />
+          <Route path="/profile" element={<ProfilePage currentUser={currentUser} portfolio={portfolio} />} />
+          <Route path="/simulator" element={<SimulatorPage />} />
+          <Route path="/recommendations" element={<RecommendationsPage ticksData={ticksData} currentUser={currentUser} aiThoughts={aiThoughts} portfolio={portfolio} />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </ProtectedLayout>
+    </UserProfileProvider>
   );
 }
 

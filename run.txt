@@ -1,0 +1,90 @@
+# DimeDoll Run Instructions
+
+## Prerequisites
+Before you begin, ensure you have the following installed on your system:
+- **Python 3.8+**
+- **Node.js 18+**
+- **Docker & Docker Compose** (for Redis)
+- **MongoDB** (running locally on port 27017, or via Docker)
+
+---
+
+## 1. Start Background Services
+
+### Redis
+Redis is configured in the provided `docker-compose.yml`. Start it with:
+```bash
+docker-compose up -d
+```
+
+### MongoDB
+The backend expects MongoDB to be running on `mongodb://localhost:27017`. 
+If you don't have MongoDB installed locally, you can quickly spin one up using Docker:
+```bash
+docker run -d -p 27017:27017 --name mongodb mongo:latest
+```
+
+---
+
+## 2. Start the Backend
+
+> [!IMPORTANT]  
+> **You must keep this terminal running.** Do not close it or use it to run the frontend. Both the frontend and backend need to run simultaneously.
+
+Open a new terminal and follow these steps to run the FastAPI backend:
+
+```bash
+cd backend
+
+# Create and activate a virtual environment (optional but recommended)
+python -m venv .venv
+# On Windows:
+.\.venv\Scripts\activate
+# On Mac/Linux:
+# source .venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Start the FastAPI server
+uvicorn main:app --reload
+```
+The backend will now be accessible at `http://localhost:8000` (and `http://localhost:8000/docs` for the Swagger UI).
+
+---
+
+## 3. Start the Frontend
+
+> [!IMPORTANT]  
+> **You must open a SECOND, SEPARATE terminal** for the frontend. Keep the backend terminal running in the background.
+
+Open another new terminal and follow these steps to run the React/Vite frontend:
+
+```bash
+cd frontend
+
+# Install Node dependencies
+npm install
+
+# Start the development server
+npm run dev
+```
+The frontend will typically be accessible at `http://localhost:5173` (check the terminal output for the exact URL).
+
+---
+
+## Troubleshooting
+
+### Docker Desktop / WSL Hanging or "Stop Pending"
+If Docker Desktop hangs, fails to start, or shows an "Unexpected WSL error", the Windows Subsystem for Linux (WSL) service may be deadlocked in the background. Note that a standard Windows restart might not fix this if "Fast Startup" is enabled.
+
+**Quick Fix:**
+1. Open **Windows PowerShell** as **Administrator**.
+2. Run the following command to forcefully kill the stuck WSL service:
+   ```bash
+   taskkill /F /IM wslservice.exe
+   ```
+3. Restart Docker Desktop.
+
+**Full Reboot Fix:**
+If the above doesn't work, perform a full "hard" reboot by opening the Run dialog (`Win + R`) and executing `shutdown /r /t 0`.

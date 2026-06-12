@@ -13,9 +13,10 @@ const AIInsightsPanel = ({ insights }) => {
   return (
     <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
       <div style={{ padding: '24px', borderBottom: '1px solid var(--panel-border)' }}>
-        <h2 className="section-title" style={{ marginBottom: 0 }}>Macro Brain Insights</h2>
+        <h2 className="section-title" style={{ marginBottom: 0 }}>Macro Algorithmic Indicators</h2>
         <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
-          DTW Pattern Matching & LLM Evaluation
+          Real-time SMA Math signals. These are mathematical opinions only and do not trade your money. 
+          The Auto-Trader AI uses these as inputs for its decisions.
         </p>
       </div>
       

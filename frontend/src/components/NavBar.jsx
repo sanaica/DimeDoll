@@ -28,6 +28,18 @@ const NavBar = ({ wsStatus }) => {
           >
             Risk Engine
           </NavLink>
+          <NavLink 
+            to="/simulator" 
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+          >
+            Simulator
+          </NavLink>
+          <NavLink 
+            to="/recommendations" 
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+          >
+            AI Advisor
+          </NavLink>
         </nav>
       </div>
       

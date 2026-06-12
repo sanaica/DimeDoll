@@ -8,7 +8,10 @@ from pydantic import BaseModel
 import hashlib
 
 from services.yfinance_fetcher import YFinanceFetcher
+from services.portfolio_trader import PortfolioTrader
 from database import connect_to_mongo, close_mongo_connection, get_database
+from routers.recommendations import router as rec_router
+from routers.predictions import router as predictions_router
 
 class UserProfile(BaseModel):
     age: int
@@ -32,6 +35,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="DimeDoll Flash Layer API")
+app.include_router(rec_router, prefix="/api")
+app.include_router(predictions_router, prefix="/api")
 
 # CORS for frontend
 app.add_middleware(
@@ -47,13 +52,14 @@ redis_client = Redis(host="localhost", port=6379, db=0, decode_responses=True)
 
 # State
 fetcher = None
+portfolio_trader = None
 active_websockets = set()
 # The tickers to track
 TICKERS = ["RELIANCE.NS", "TCS.NS", "INFY.NS", "HDFCBANK.NS"]
 
 @app.on_event("startup")
 async def startup_event():
-    global redis_client, fetcher
+    global redis_client, fetcher, portfolio_trader
     redis_client = Redis(host="localhost", port=6379, db=0, decode_responses=True)
     await connect_to_mongo()
     
@@ -62,11 +68,18 @@ async def startup_event():
     asyncio.create_task(fetcher.fetch_and_publish())
     logger.info("Started background fetcher.")
 
+    # Start the Portfolio Auto-Trader
+    portfolio_trader = PortfolioTrader(redis_client, TICKERS)
+    asyncio.create_task(portfolio_trader.run())
+    logger.info("Started Portfolio Auto-Trader.")
+
 @app.on_event("shutdown")
 async def shutdown_event():
-    global fetcher
+    global fetcher, portfolio_trader
     if fetcher:
         fetcher.stop()
+    if portfolio_trader:
+        portfolio_trader.stop()
     await redis_client.close()
     await close_mongo_connection()
     logger.info("Shutdown complete.")
@@ -217,12 +230,15 @@ async def get_profile(username: str = "default_user"):
     db = get_database()
     user = await db.users.find_one({"username": username})
     if user and "profile" in user:
+        await redis_client.set("user:profile", json.dumps(user["profile"]))
+        await redis_client.set("active_username", username)
         return user["profile"]
     return {}
 
 @app.get("/api/portfolio")
 async def get_portfolio(username: str = "default_user"):
     db = get_database()
+    await redis_client.set("active_username", username)
     portfolio = await db.portfolios.find_one({"username": username})
     if portfolio:
         portfolio.pop("_id", None)
@@ -258,3 +274,19 @@ async def deposit(req: DepositRequest):
         # Broadcast update
         await redis_client.publish("live_ticks", json.dumps({"type": "portfolio_update", "data": portfolio}))
     return {"status": "success"}
+
+# ---- Auto-AI Toggle ----
+
+class AutoAIRequest(BaseModel):
+    enabled: bool
+
+@app.post("/api/auto-ai/toggle")
+async def toggle_auto_ai(req: AutoAIRequest):
+    await redis_client.set("auto_ai_enabled", "true" if req.enabled else "false")
+    return {"status": "success", "auto_ai": req.enabled}
+
+@app.get("/api/auto-ai/status")
+async def get_auto_ai_status():
+    val = await redis_client.get("auto_ai_enabled")
+    return {"auto_ai": val == "true"}
+
