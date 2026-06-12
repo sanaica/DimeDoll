@@ -88,3 +88,17 @@ If Docker Desktop hangs, fails to start, or shows an "Unexpected WSL error", the
 
 **Full Reboot Fix:**
 If the above doesn't work, perform a full "hard" reboot by opening the Run dialog (`Win + R`) and executing `shutdown /r /t 0`.
+
+---
+
+## 4. Shutting Down
+
+To safely shut down the entire project and free up memory, perform these steps in order:
+
+1. **Stop the Frontend:** Go to the terminal where Vite is running and press `Ctrl + C`. Type `y` and hit enter if it asks to terminate the batch job.
+2. **Stop the Backend:** Go to the terminal where FastAPI is running and press `Ctrl + C`.
+3. **Stop Docker Services:** Open a terminal in the root `DimeDoll` folder (where `docker-compose.yml` is located) and run:
+   ```bash
+   docker compose down
+   ```
+   *(Note: If you are using an older version of Docker, the command is `docker-compose down`).* This safely stops and removes the database and Redis containers without losing your data.
