@@ -1,8 +1,36 @@
-version: '3.8'
 services:
+  # The web backend
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017
+      - MONGODB_DB=dimedoll
+      - REDIS_URL=redis://redis:6379/0
+      # Pass your API key via the host environment or a .env file next to this docker-compose.yml
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+    depends_on:
+      - redis
+      - mongo
+    restart: unless-stopped
+
+  # Local Redis for pub/sub and caching
   redis:
     image: redis:alpine
     ports:
       - "6379:6379"
     restart: unless-stopped
     command: redis-server --appendonly yes
+
+  # Local MongoDB for user data
+  mongo:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    restart: unless-stopped
+
+volumes:
+  mongo_data:

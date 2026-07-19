@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { API_URL } from '../config';
 
 const UserProfileContext = createContext(null);
 
@@ -18,12 +19,12 @@ export function UserProfileProvider({ children, currentUser }) {
     setLoading(true);
 
     Promise.all([
-      fetch(`http://localhost:8000/api/profile?username=${currentUser}`)
+      fetch(`${API_URL}/api/profile?username=${currentUser}`)
         .then(res => res.json())
         .catch(() => ({})),
-      fetch(`http://localhost:8000/api/portfolio?username=${currentUser}`)
+      fetch(`${API_URL}/api/portfolio?username=${currentUser}`)
         .then(res => res.json())
-        .catch(() => ({ cash: 0, holdings: {}, total_deposited: 0 }))
+        .catch(() => ({ cash: 0, holdings: {}, total_deposited: 0 })),
     ]).then(([prof, port]) => {
       setProfile(prof);
       setPortfolio(port);
@@ -35,18 +36,18 @@ export function UserProfileProvider({ children, currentUser }) {
     profile,
     portfolio,
     loading,
-    capital: portfolio?.cash !== undefined ? portfolio.cash : 50000,
+    capital: portfolio?.cash !== undefined ? portfolio.cash : 0,
     riskTolerance: profile?.risk_tolerance || 'Moderate',
     horizon: 5,
     refreshProfile: async () => {
       if (!currentUser) return;
-      const res = await fetch(`http://localhost:8000/api/profile?username=${currentUser}`);
+      const res = await fetch(`${API_URL}/api/profile?username=${currentUser}`);
       const data = await res.json();
       setProfile(data);
     },
     updatePortfolio: (newPortfolio) => {
       setPortfolio(newPortfolio);
-    }
+    },
   };
 
   return (

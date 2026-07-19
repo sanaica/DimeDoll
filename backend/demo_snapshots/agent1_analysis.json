@@ -1,0 +1,15 @@
+{
+  "risk_level": "Medium",
+  "risk_summary": "Your portfolio is reasonably balanced with some cash ready to deploy. The deterministic scoring models highlight solid fundamentals for the suggested stocks.",
+  "diversification_notes": "Currently holding a good mix, but could expand into IT or Pharma.",
+  "suggestions": [
+    {
+      "ticker": "TCS.NS",
+      "action": "BUY",
+      "quantity": 2,
+      "reasoning": "Strong deterministic score of 8.5/10 with zero red flags and excellent momentum.",
+      "confidence": 85
+    }
+  ],
+  "overall_reasoning": "Market trends are favorable, and the deterministic tool scores support a growth-oriented approach right now."
+}

@@ -5,15 +5,33 @@ import DashboardPage from './pages/DashboardPage';
 import WalletPage from './pages/WalletPage';
 import ProfilePage from './pages/ProfilePage';
 import AuthPage from './pages/AuthPage';
-import SimulatorPage from './pages/SimulatorPage';
-import RecommendationsPage from './pages/RecommendationsPage';
+import AcademyPage from './pages/AcademyPage';
 import { UserProfileProvider } from './context/UserProfileContext';
+import { API_URL, WS_URL } from './config';
 
-const ProtectedLayout = ({ children, wsStatus, currentUser }) => {
+const SimulatedBanner = () => (
+  <div style={{
+    textAlign: 'center',
+    padding: '6px 0',
+    background: 'rgba(196, 131, 90, 0.06)',
+    borderBottom: '1px solid rgba(196, 131, 90, 0.12)',
+    fontSize: '0.72rem',
+    color: '#C4835A',
+    fontWeight: 500,
+    letterSpacing: '0.3px',
+  }}>
+    🎓 Simulated portfolio · No real money is involved · Built for learning
+  </div>
+);
+
+const ProtectedLayout = ({ children, wsStatus }) => {
   return (
-    <div className="dashboard-container">
-      <NavBar wsStatus={wsStatus} />
-      {children}
+    <div>
+      <SimulatedBanner />
+      <div className="dashboard-container">
+        <NavBar wsStatus={wsStatus} />
+        {children}
+      </div>
     </div>
   );
 };
@@ -26,13 +44,14 @@ function MainApp() {
   const [executedTrades, setExecutedTrades] = useState([]);
   const [portfolio, setPortfolio] = useState(null);
   const [aiThoughts, setAiThoughts] = useState("");
-  
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
     if (currentUser) {
-      fetch(`http://localhost:8000/api/portfolio?username=${currentUser}`)
+      fetch(`${API_URL}/api/portfolio?username=${currentUser}`)
         .then(res => res.json())
         .then(data => {
           if (data && data.cash !== undefined) {
@@ -40,56 +59,69 @@ function MainApp() {
           }
         })
         .catch(err => console.error("Could not load initial portfolio", err));
-        
-      fetch(`http://localhost:8000/api/profile?username=${currentUser}`)
+
+      fetch(`${API_URL}/api/profile?username=${currentUser}`)
         .then(res => res.json())
         .then(data => {
-           // Enforce Onboarding: if no risk profile set, force to profile page
-           if (Object.keys(data).length === 0 && location.pathname !== '/profile') {
-               navigate('/profile');
-           }
+          if (Object.keys(data).length === 0 && location.pathname !== '/profile') {
+            navigate('/profile');
+          }
         });
     }
   }, [currentUser]);
 
+  // WebSocket with exponential backoff
   useEffect(() => {
     if (!currentUser) return;
-    
+
     let ws;
-    let reconnectInterval;
+    let reconnectTimer;
+    let backoff = 1000;
+    const MAX_BACKOFF = 30000;
 
     const connectWs = () => {
-      ws = new WebSocket('ws://localhost:8000/ws/live-ticks');
+      ws = new WebSocket(`${WS_URL}/ws/live-ticks`);
 
       ws.onopen = () => {
         setWsStatus('connected');
-        if (reconnectInterval) clearInterval(reconnectInterval);
+        backoff = 1000; // reset on success
       };
 
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
-          
+
           if (message.type === 'initial_data' || message.type === 'ticks_update') {
             const dataArr = message.data;
-            const newTicks = { ...ticksData };
-            const newInsights = { ...insights };
-            
-            dataArr.forEach(item => {
-              newTicks[item.ticker] = { price: item.price, timestamp: item.timestamp, history: item.history, insight: item.insight };
-              if (item.insight && Object.keys(item.insight).length > 0) {
-                newInsights[item.ticker] = item.insight;
-              }
+            setTicksData(prev => {
+              const next = { ...prev };
+              dataArr.forEach(item => {
+                next[item.ticker] = {
+                  price: item.price,
+                  timestamp: item.timestamp,
+                  history: item.history,
+                  insight: item.insight,
+                };
+              });
+              return next;
             });
-            
-            setTicksData(prev => ({ ...prev, ...newTicks }));
-            setInsights(prev => ({ ...prev, ...newInsights }));
-          } else if (message.type === 'trade_execution') {
+            setInsights(prev => {
+              const next = { ...prev };
+              dataArr.forEach(item => {
+                if (item.insight && Object.keys(item.insight).length > 0) {
+                  next[item.ticker] = item.insight;
+                }
+              });
+              return next;
+            });
+          } else if (message.type === 'trade_execution' || message.type === 'auto_trader_execution') {
             setExecutedTrades(prev => [...message.data, ...prev]);
           } else if (message.type === 'portfolio_update') {
             setPortfolio(message.data);
           } else if (message.type === 'auto_trader_thoughts') {
             setAiThoughts(message.data);
+          } else if (message.type === 'auto_trader_analysis') {
+            setAiAnalysis(message.data);
           }
         } catch (error) {
           console.error('Error parsing websocket message', error);
@@ -98,18 +130,26 @@ function MainApp() {
 
       ws.onclose = () => {
         setWsStatus('disconnected');
-        reconnectInterval = setTimeout(connectWs, 3000);
+        reconnectTimer = setTimeout(() => {
+          backoff = Math.min(backoff * 1.5, MAX_BACKOFF);
+          connectWs();
+        }, backoff);
       };
 
-      ws.onerror = (error) => ws.close();
+      ws.onerror = () => ws.close();
     };
 
     connectWs();
     return () => {
       if (ws) ws.close();
-      if (reconnectInterval) clearInterval(reconnectInterval);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
     };
   }, [currentUser]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('dimedoll_user');
+    setCurrentUser(null);
+  };
 
   if (!currentUser) {
     return <AuthPage onAuthSuccess={(user) => setCurrentUser(user)} />;
@@ -117,14 +157,28 @@ function MainApp() {
 
   return (
     <UserProfileProvider currentUser={currentUser}>
-      <ProtectedLayout wsStatus={wsStatus} currentUser={currentUser}>
+      <ProtectedLayout wsStatus={wsStatus}>
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<DashboardPage ticksData={ticksData} insights={insights} currentUser={currentUser} portfolio={portfolio} />} />
-          <Route path="/wallet" element={<WalletPage portfolio={portfolio} ticksData={ticksData} executedTrades={executedTrades} currentUser={currentUser} />} />
-          <Route path="/profile" element={<ProfilePage currentUser={currentUser} portfolio={portfolio} />} />
-          <Route path="/simulator" element={<SimulatorPage />} />
-          <Route path="/recommendations" element={<RecommendationsPage ticksData={ticksData} currentUser={currentUser} aiThoughts={aiThoughts} portfolio={portfolio} />} />
+          <Route path="/dashboard" element={
+            <DashboardPage ticksData={ticksData} insights={insights} currentUser={currentUser} portfolio={portfolio} />
+          } />
+          <Route path="/wallet" element={
+            <WalletPage 
+              portfolio={portfolio} 
+              ticksData={ticksData} 
+              executedTrades={executedTrades} 
+              currentUser={currentUser} 
+              aiThoughts={aiThoughts}
+              aiAnalysis={aiAnalysis}
+            />
+          } />
+          <Route path="/profile" element={
+            <ProfilePage currentUser={currentUser} portfolio={portfolio} onLogout={handleLogout} />
+          } />
+          <Route path="/academy" element={
+            <AcademyPage />
+          } />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </ProtectedLayout>

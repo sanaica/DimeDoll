@@ -1,9 +1,12 @@
 fastapi
-uvicorn
+uvicorn[standard]
 redis
 yfinance
 websockets
 pydantic
 motor>=3.4.0
-google-generativeai
-anthropic
+python-dotenv
+openai
+httpx
+pandas
+aiohttp

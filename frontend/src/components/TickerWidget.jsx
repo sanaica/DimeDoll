@@ -42,7 +42,7 @@ const TickerWidget = ({ symbol, data, currentUser, portfolio }) => {
       
       const payload = {
         ticker: symbol,
-        capital: portfolio?.cash || 100000,
+        capital: portfolio?.cash || 0,
         risk_tolerance: profile.risk_tolerance || "Moderate",
         horizon: 5,
         current_price: data.price,

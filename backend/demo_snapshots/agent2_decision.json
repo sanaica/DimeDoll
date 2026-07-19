@@ -1,0 +1,11 @@
+{
+  "summary": "Executed Agent 1's recommendation to acquire TCS.NS based on its high deterministic score and clean fundamental profile.",
+  "trades": [
+    {
+      "ticker": "TCS.NS",
+      "action": "BUY",
+      "quantity": 2,
+      "reason": "Agent 1 highlighted a strong deterministic score. Sufficient cash is available."
+    }
+  ]
+}

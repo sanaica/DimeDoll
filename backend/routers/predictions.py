@@ -1,14 +1,24 @@
+"""
+Prediction tracker — tracks AI decisions vs real market outcomes.
+"""
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 from bson import ObjectId
 import json
+import os
+from urllib.parse import urlparse
 
 from database import get_database
 
 router = APIRouter()
 
+
+from redis.asyncio import Redis
+redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+redis_client = Redis.from_url(redis_url, decode_responses=True, health_check_interval=30, retry_on_timeout=True)
 
 class PredictionTrackRequest(BaseModel):
     ticker: str
@@ -51,7 +61,7 @@ async def track_prediction(req: PredictionTrackRequest):
     return {
         "status": "success",
         "prediction_id": str(result.inserted_id),
-        "message": f"Tracking {req.decision} on {req.ticker} at ₹{req.entry_price:.2f}"
+        "message": f"Tracking {req.decision} on {req.ticker} at ₹{req.entry_price:.2f}",
     }
 
 
@@ -59,10 +69,6 @@ async def track_prediction(req: PredictionTrackRequest):
 async def get_predictions(username: str = "default_user"):
     """Fetch all predictions for a user with live P&L computed from Redis-cached prices."""
     db = get_database()
-
-    # Import redis here to access the cached live prices
-    from redis.asyncio import Redis
-    redis_client = Redis(host="localhost", port=6379, db=0, decode_responses=True)
 
     try:
         cursor = db.ai_predictions.find({"username": username}).sort("created_at", -1)
@@ -81,22 +87,21 @@ async def get_predictions(username: str = "default_user"):
                 "created_at": doc["created_at"],
                 "closed_at": doc.get("closed_at"),
                 "exit_price": doc.get("exit_price"),
+                "source": doc.get("source", "manual"),
             }
 
             # Compute live P&L for open predictions
             if doc["status"] == "open":
-                # Get live price from Redis cache (set by Flash Layer fetcher)
                 cached = await redis_client.get(f"ticker:{doc['ticker']}")
                 if cached:
                     tick_data = json.loads(cached)
                     current_price = tick_data["price"]
                 else:
-                    current_price = doc["entry_price"]  # fallback
+                    current_price = doc["entry_price"]
 
                 pred["current_price"] = current_price
                 pred = _compute_pnl(pred, current_price)
             elif doc["status"] == "closed" and doc.get("exit_price"):
-                # Use the locked exit price
                 pred["current_price"] = doc["exit_price"]
                 pred = _compute_pnl(pred, doc["exit_price"])
 
@@ -112,7 +117,7 @@ async def get_predictions(username: str = "default_user"):
 
             predictions.append(pred)
 
-        # Compute summary stats
+        # Summary stats
         total = len(predictions)
         resolved = [p for p in predictions if p.get("was_correct") is not None]
         correct = [p for p in resolved if p["was_correct"]]
@@ -129,7 +134,7 @@ async def get_predictions(username: str = "default_user"):
                 "correct_count": len(correct),
                 "wrong_count": len(resolved) - len(correct),
                 "total_pnl": round(total_pnl, 2),
-            }
+            },
         }
     finally:
         await redis_client.close()
@@ -148,15 +153,13 @@ async def close_prediction(prediction_id: str, req: PredictionCloseRequest):
     doc = await db.ai_predictions.find_one({"_id": obj_id})
     if not doc:
         raise HTTPException(404, "Prediction not found")
-
     if doc["status"] == "closed":
         raise HTTPException(400, "Prediction is already closed")
 
-    # Compute final P&L
-    result_data = _compute_pnl({
-        "decision": doc["decision"],
-        "entry_price": doc["entry_price"],
-    }, req.exit_price)
+    result_data = _compute_pnl(
+        {"decision": doc["decision"], "entry_price": doc["entry_price"]},
+        req.exit_price,
+    )
 
     await db.ai_predictions.update_one(
         {"_id": obj_id},
@@ -167,7 +170,7 @@ async def close_prediction(prediction_id: str, req: PredictionCloseRequest):
             "final_pnl_amount": result_data["pnl_amount"],
             "final_pnl_percent": result_data["pnl_percent"],
             "final_was_correct": result_data["was_correct"],
-        }}
+        }},
     )
 
     return {
@@ -188,7 +191,7 @@ def _compute_pnl(pred: dict, current_price: float) -> dict:
         pnl = current_price - entry
         was_correct = current_price > entry
     elif decision == "SELL":
-        pnl = entry - current_price  # profit when price drops
+        pnl = entry - current_price
         was_correct = current_price < entry
     else:
         pnl = 0
@@ -206,15 +209,11 @@ def _compute_pnl(pred: dict, current_price: float) -> dict:
 def _format_elapsed(delta) -> str:
     """Format a timedelta into a human-readable string."""
     total_seconds = int(delta.total_seconds())
-
     if total_seconds < 60:
         return f"{total_seconds}s ago"
     elif total_seconds < 3600:
-        minutes = total_seconds // 60
-        return f"{minutes}m ago"
+        return f"{total_seconds // 60}m ago"
     elif total_seconds < 86400:
-        hours = total_seconds // 3600
-        return f"{hours}h ago"
+        return f"{total_seconds // 3600}h ago"
     else:
-        days = total_seconds // 86400
-        return f"{days}d ago"
+        return f"{total_seconds // 86400}d ago"
