@@ -427,6 +427,7 @@ Respond ONLY with valid JSON:
     async def run(self):
         """Background loop: Agent 1 → Agent 2 → execute, when auto_ai_enabled."""
         self.is_running = True
+        self._ticker_index = getattr(self, '_ticker_index', 0)
         logger.info("Started two-stage Portfolio Auto-Trader.")
 
         while self.is_running:
@@ -463,12 +464,19 @@ Respond ONLY with valid JSON:
                     await asyncio.sleep(self.CHECK_INTERVAL)
                     continue
 
-                # Gather market data from core tier
+                # Process ONE ticker per cycle (round-robin) to avoid API rate limits
+                if not self.tickers:
+                    await asyncio.sleep(self.CHECK_INTERVAL)
+                    continue
+
+                target_ticker = self.tickers[self._ticker_index % len(self.tickers)]
+                self._ticker_index += 1
+
                 market_data = {}
-                for t in self.tickers:
-                    val = await self.redis.get(f"ticker:{t}")
-                    if val:
-                        market_data[t] = json.loads(val)
+                val = await self.redis.get(f"ticker:{target_ticker}")
+                if val:
+                    market_data[target_ticker] = json.loads(val)
+                
                 if not market_data:
                     await asyncio.sleep(self.CHECK_INTERVAL)
                     continue

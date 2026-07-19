@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, CheckCircle, XCircle, Clock, X, RefreshCw, Award, BarChart3, Crosshair } from 'lucide-react';
+import { API_URL } from '../config';
 
 const PredictionTracker = ({ currentUser }) => {
   const [predictions, setPredictions] = useState([]);
@@ -11,7 +12,7 @@ const PredictionTracker = ({ currentUser }) => {
     if (!currentUser) return;
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/predictions?username=${currentUser}`);
+      const res = await fetch(`${API_URL}/api/predictions?username=${currentUser}`);
       const data = await res.json();
       setPredictions(data.predictions || []);
       setSummary(data.summary || null);
@@ -31,7 +32,7 @@ const PredictionTracker = ({ currentUser }) => {
   const closePrediction = async (predId, currentPrice) => {
     setClosingId(predId);
     try {
-      const res = await fetch(`http://localhost:8000/api/predictions/${predId}/close`, {
+      const res = await fetch(`${API_URL}/api/predictions/${predId}/close`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ exit_price: currentPrice })

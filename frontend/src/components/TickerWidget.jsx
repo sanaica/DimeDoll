@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Sparkles, Activity } from 'lucide-react';
+import { API_URL } from '../config';
 
 const TickerWidget = ({ symbol, data, currentUser, portfolio }) => {
   const [flashClass, setFlashClass] = useState('');
@@ -37,7 +38,7 @@ const TickerWidget = ({ symbol, data, currentUser, portfolio }) => {
     setDecision(null);
     try {
       // Get the profile to populate the request
-      const profRes = await fetch(`http://localhost:8000/api/profile?username=${currentUser}`);
+      const profRes = await fetch(`${API_URL}/api/profile?username=${currentUser}`);
       const profile = await profRes.json();
       
       const payload = {
@@ -50,7 +51,7 @@ const TickerWidget = ({ symbol, data, currentUser, portfolio }) => {
         ma200: data.price * 0.95 
       };
 
-      const res = await fetch('http://localhost:8000/api/trade-decision', {
+      const res = await fetch(`${API_URL}/api/trade-decision`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

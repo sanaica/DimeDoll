@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Sparkles, Activity, TrendingUp, TrendingDown, BarChart3, Clock, Target, RefreshCw, Crosshair } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer, YAxis } from 'recharts';
 import { useUserProfile } from '../context/UserProfileContext';
+import { API_URL } from '../config';
 
 const StockCard = ({ symbol, data, currentUser }) => {
   const { capital, riskTolerance, horizon } = useUserProfile();
@@ -30,7 +31,7 @@ const StockCard = ({ symbol, data, currentUser }) => {
     setDecision(null);
     setTracked(false);
     try {
-      const res = await fetch('http://localhost:8000/api/ai-trade-decision', {
+      const res = await fetch(`${API_URL}/api/ai-trade-decision`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -53,7 +54,7 @@ const StockCard = ({ symbol, data, currentUser }) => {
     if (!decision || !currentUser || tracked) return;
     setTrackingLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/api/predictions/track', {
+      const res = await fetch(`${API_URL}/api/predictions/track`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
