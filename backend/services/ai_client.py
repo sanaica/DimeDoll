@@ -177,10 +177,15 @@ def chat_with_tools(
     if tools:
         kwargs["tools"] = tools
 
-    # Tool calling is complex, we bypass FREE_MODEL and use PAID_MODEL directly for reliability
+    # Try free model first
     try:
-        resp = client.chat.completions.create(model=PAID_MODEL, **kwargs)
+        resp = client.chat.completions.create(model=FREE_MODEL, **kwargs)
         return resp.choices[0].message
-    except Exception as e:
-        logger.error(f"chat_with_tools failed: {e}")
-        raise
+    except Exception as free_err:
+        logger.warning(f"chat_with_tools free model failed: {free_err}, trying paid fallback...")
+        try:
+            resp = client.chat.completions.create(model=PAID_MODEL, **kwargs)
+            return resp.choices[0].message
+        except Exception as e:
+            logger.error(f"chat_with_tools failed completely: {e}")
+            raise

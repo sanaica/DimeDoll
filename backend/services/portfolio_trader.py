@@ -202,16 +202,29 @@ Respond ONLY with valid JSON in this exact structure:
                     })
                 
                 # 2. Second API call (force JSON)
-                from services.ai_client import _get_client, PAID_MODEL
+                from services.ai_client import _get_client, FREE_MODEL, PAID_MODEL
                 client = _get_client()
-                resp = await asyncio.to_thread(
-                    client.chat.completions.create,
-                    model=PAID_MODEL,
-                    messages=messages,
-                    max_tokens=1500,
-                    temperature=0.5,
-                    response_format={"type": "json_object"}
-                )
+                
+                try:
+                    resp = await asyncio.to_thread(
+                        client.chat.completions.create,
+                        model=FREE_MODEL,
+                        messages=messages,
+                        max_tokens=1500,
+                        temperature=0.5,
+                        response_format={"type": "json_object"}
+                    )
+                except Exception as free_e:
+                    logger.warning(f"Agent 1 free model failed on second call: {free_e}")
+                    resp = await asyncio.to_thread(
+                        client.chat.completions.create,
+                        model=PAID_MODEL,
+                        messages=messages,
+                        max_tokens=1500,
+                        temperature=0.5,
+                        response_format={"type": "json_object"}
+                    )
+                
                 raw_content = resp.choices[0].message.content
                 result = parse_json(raw_content)
             else:
